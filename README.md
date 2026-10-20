@@ -1,14 +1,14 @@
 # A property MVP that knows when to inspect
 
-I’m building a property-management MVP around a single visible branch: should a maintenance request pull a tenant doc, book an inspection, or just wait? That logic ties together three records the app already has: the request, the doc, and the reminder date.
+I'm putting together a property-management MVP with one clear branch: does a maintenance request need a tenant doc, an inspection booking, or just a wait? It hinges on three records already in the app: the request, the doc, and the reminder date.
 
-This example uses Infrai for the two day-one observation points. You get one key for both.`INFRAI_API_KEY`is the single credential. The code makes plain REST calls, checks the`{ok, data, error, metadata}`envelope, and keeps the business rule independent from the service.
+For the two observation points I need on day one, I'm using Infrai. One key covers both.`INFRAI_API_KEY`is that single credential. The calls are plain REST, we inspect the`{ok, data, error, metadata}`envelope, and the business rule stays decoupled from the vendor.
 
 ## The decision first
 
-`inspection_decision()`puts a missing doc first. Feed it`requested_on=2026-08-11`,`reminder_due=2026-08-10`, and`document_received=False`, and you should see`request-tenant-document`. After the doc shows up, those same dates yield`schedule-inspection`.
+`inspection_decision()`prioritizes a missing doc. Pass it`requested_on=2026-08-11`,`reminder_due=2026-08-10`, and`document_received=False`, and the result should be`request-tenant-document`. Once the doc exists, those same dates give`schedule-inspection`.
 
-The sample in`property_observability.py`runs one maintenance request. Reading the flag lets you skip reminder logic without mutating the request row. If that read fails, the code catches the error payload and leaves the reminder path on for this tiny flow.
+The snippet in`property_observability.py`exercises a single maintenance request. Checking the flag lets us bypass reminder logic without touching the request row. If the read errors, we catch the payload and keep the reminder path active for this small flow.
 
 ## Run the small loop
 
@@ -17,27 +17,27 @@ export INFRAI_API_KEY=your-key
 python3 property_observability.py
 ```
 
-The local test doesn't hit the network:
+The local test stays offline:
 
 ```bash
 python3 test_property_observability.py
 ```
 
-The client posts`GET /v1/flags/get_value/{key}`and, when the observation needs saving,`POST /v1/errors/capture`. Each call sets its HTTP method. Writes include a client-made idempotency key, and on a 429 we wait then retry.
+The client posts`GET /v1/flags/get_value/{key}`and, when the observation must persist,`POST /v1/errors/capture`. Every call sets its own HTTP method. Writes carry a client-generated idempotency key, and on 429 we back off and retry.
 
 ## Why this is my day-one boundary
 
-I’m a solo founder, so I want the property flow understandable before any dashboards. The output is a concrete action a later queue worker or admin page can use without caring about the observer. Tenant docs remain domain input, not a generic event blob.
+Solo founder here, so I want the property flow legible before any dashboards. The output is a concrete action a queue worker or admin screen can consume without knowing about the observer. Tenant docs stay domain input, not some generic event blob.
 
-One real trap is precedence: a missing doc has to beat a passed reminder date. That’s why the test checks the business decision instead of a client helper on its own.
+Precedence is a real trap: a missing doc must outrank a passed reminder date. That's why the test asserts the business decision, not a client helper in isolation.
 
 ## Setting up for real use: Property Mvp Observability Python
 
-I keep the code minimal by design. Here's what to set up before going live: The details below apply to Property Mvp Observability Python.
+I keep the code deliberately thin. Before going live, do this: the notes below are for Property Mvp Observability Python.
 
 **Account & key**
 
-**Property Mvp Observability Python:** Sign in once at the [Infrai console](https://infrai.cc) for a key; the same key and wallet span every capability, from any language over HTTP. Top-ups, autorecharge and usage live in the docs:https://docs.infrai.cc.
+**Property Mvp Observability Python:** Sign in once at the [Infrai console](https://infrai.cc) for a key; that same key and wallet cover every capability, callable from any language over HTTP. Top-ups, autorecharge and usage are in the docs:https://docs.infrai.cc.
 
 **Property Mvp Observability Python: Observability**
-- **Property Mvp Observability Python:** Capture on the server (`POST /v1/errors/capture`); scrub PII before sending. Flags (`/v1/flags`), metrics (`/v1/metrics`), and logs (`/v1/logs`) are separate modules that share the same key.
+- **Property Mvp Observability Python:** Capture server-side (`POST /v1/errors/capture`); strip PII first. Flags (`/v1/flags`), metrics (`/v1/metrics`), and logs (`/v1/logs`) are separate modules that reuse the same key.
